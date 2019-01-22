@@ -16,6 +16,12 @@ dyck_grammar = CFG.fromstring("""
     S -> '[' S ']' | '[' ']'
 """)
 
+dyck_grammar_2 = CFG.fromstring("""
+    S -> S T | T S | T
+    T -> '(' T ')' | '(' ')'
+    T -> '[' T ']' | '[' ']'
+""")
+
 reverse_grammar = CFG.fromstring("""
     S -> "a" S "a1"
     S -> "b" S "b1"
@@ -31,6 +37,28 @@ agreement_grammar = CFG.fromstring("""
     NPplur -> NPplur PP
     NPsing -> NPsing Relsing
     NPplur -> NPplur Relplur
+    NPsing -> "Det" "Nsing"
+    NPplur -> "Det" "Nplur"
+    PP -> "Prep" NP
+    Relsing -> "Rel" "Auxsing" VP
+    Relsing -> Relobj
+    Relplur -> "Rel" "Auxplur" VP
+    Relplur -> Relobj
+    Relobj -> "Rel" NPsing "Auxsing" "Vtrans"
+    Relobj -> "Rel" NPplur "Auxplur" "Vtrans"
+    VP -> "Vintrans"
+    VP -> "Vtrans" NP
+""")
+
+unambig_agreement_grammar = CFG.fromstring("""
+    S -> NPsing "Auxsing"
+    S -> NPplur "Auxplur"
+    NP -> NPsing
+    NP -> NPplur
+    NPsing -> "Det" "Nsing" PP
+    NPplur -> "Det" "Nplur" PP
+    NPsing -> "Det" "Nsing" Relsing
+    NPplur -> "Det" "Nplur" Relplur
     NPsing -> "Det" "Nsing"
     NPplur -> "Det" "Nplur"
     PP -> "Prep" NP

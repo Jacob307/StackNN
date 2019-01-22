@@ -14,7 +14,7 @@ from nltk import CFG, PCFG
 import random
 from itertools import izip
 
-from models.vanilla import VanillaController
+from models.vanilla import VanillaModel
 
 # Language parameters
 MAX_LENGTH = 25  # bound on length of string (or prefix thereof)
@@ -132,14 +132,14 @@ print "random sample string = {}".format(random.choice(sample_strings))
 
 #################################
 
-model = VanillaController(len(code_for), READ_SIZE, len(code_for))
+model = VanillaModel(len(code_for), READ_SIZE, len(code_for))
 try:
     model.cuda()
 except AssertionError:
     pass
 
 # Requires PyTorch 0.3.x
-criterion = nn.CrossEntropyLoss(reduce=False)
+criterion = nn.CrossEntropyLoss(reduction='none')
 
 
 def generate_sample(grammar, prod, frags):

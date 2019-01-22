@@ -3,7 +3,10 @@ from __future__ import print_function, division
 import torch
 from torch.autograd import Variable
 
-from testcase import testcase, test_module, is_close
+from stacknn_utils.testcase import testcase, test_module, is_close
+
+# Useful for debugging. Make sure it is larger than test set.
+_MAX_COUNT = 100000
 
 
 def binary_reg_fn(strengths):
@@ -34,19 +37,23 @@ class InterfaceRegTracker(object):
         self._count = 0
 
     @property
+    def reg_weight(self):
+        return self._reg_weight
+    
+    @property
     def loss(self):
         return self._reg_weight * self._loss / self._count
 
     def regularize(self, strengths):
+        assert self._count < _MAX_COUNT, \
+            "Max regularization count exceeded. Are you calling reg_tracker.reset()?"
         losses = self._reg_fn(strengths)
         self._loss += torch.sum(losses)
         self._count += len(losses)
 
-    def get_and_reset(self):
-        loss = self.loss
+    def reset(self):
         self._loss = Variable(torch.zeros([1]))
         self._count = 0
-        return loss
 
 
 @testcase(InterfaceRegTracker)

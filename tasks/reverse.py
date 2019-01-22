@@ -6,169 +6,43 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-from base import Task
-from models import VanillaController
-from models.networks.feedforward import LinearSimpleStructNetwork
+from tasks.base import FormalTask
+from models import VanillaModel
+from controllers.feedforward import LinearSimpleStructController
 from structs import Stack
 
-class ReverseTask(Task):
-    """
-    String Reversal
-    """
 
-    def __init__(self,
-                 min_length=1,
-                 max_length=12,
-                 mean_length=10,
-                 std_length=2.,
-                 batch_size=10,
-                 criterion=nn.CrossEntropyLoss(),
-                 cuda=False,
-                 epochs=30,
-                 hidden_size=10,
-                 learning_rate=0.01,
-                 load_path=None,
-                 l2_weight=0.01,
-                 model=None,
-                 model_type=VanillaController,
-                 network_type=LinearSimpleStructNetwork,
-                 read_size=2,
-                 save_path=None,
-                 struct_type=Stack,
-                 time_function=(lambda t: t),
-                 verbose=True):
-        """
-        Constructor for the ReverseTask object. The only information
-        that needs to be specified by the user is information about the
-        distribution of the strings appearing in the input data.
+class ReverseTask(FormalTask):
 
-        :type min_length: int
-        :param min_length: The shortest possible length of an input
-            string
+    """String reversal task."""
 
-        :type max_length: int
-        :param max_length: The longest possible length of an input
-            string
 
-        :type mean_length: int
-        :param mean_length: The average length of an input string
+    class Params(FormalTask.Params):
 
-        :type std_length: float
-        :param std_length: The standard deviation of the length of an
-            input string
+        def __init__(self, **kwargs):
+            self.min_length = kwargs.get("min_length", 1)
+            self.max_length = kwargs.get("max_length", 12)
+            self.mean_length = kwargs.get("mean_length", 10)
+            self.std_length = kwargs.get("std_length", 2.)
+            self.num_symbols = kwargs.get("num_symbols", 2)
+            super(ReverseTask.Params, self).__init__(**kwargs)
 
-        :type batch_size: int
-        :param batch_size: The number of trials in each mini-batch
+            # Override parameters from more abstract tasks.
+            self.null = unicode(self.num_symbols)
+            self.max_x_length = self.max_length * 2
+            self.max_y_length = self.max_length * 8
 
-        :type criterion: nn.modules.loss._Loss
-        :param criterion: The error function used for training the model
 
-        :type cuda: bool
-        :param cuda: If True, CUDA functionality will be used
+    @property
+    def input_size(self):
+        return self.alphabet_size
 
-        :type epochs: int
-        :param epochs: The number of training epochs that will be
-            performed when executing an experiment
+    @property
+    def output_size(self):
+        return self.alphabet_size
 
-        :type hidden_size: int
-        :param hidden_size: The size of state vectors
-
-        :type learning_rate: float
-        :param learning_rate: The learning rate used for training
-
-        :type load_path: str
-        :param load_path: The neural network will be initialized to a
-            saved network located in this path. If load_path is set to
-            None, then the network will be initialized to an empty state
-
-        :type l2_weight: float
-        :param l2_weight: The amount of l2 regularization used for
-            training
-
-        :param model: The model that will be trained and evaluated.
-            This parameter is being kept for compatibility with older
-            code. Please use the model_type parameter instead in order
-            to automatically instantiate models
-
-        :type model_type: type
-        :param model_type: The type of Controller that will be trained
-            and evaluated
-
-        :type network_type: type
-        :param network_type: The type of neural network that will drive
-            the Controller
-
-        :type read_size: int
-        :param read_size: The length of the vectors stored on the neural
-            data structure
-
-        :type save_path: str
-        :param save_path: If this param is not set to None, then the
-            neural network will be saved to the path specified by this
-            save_path
-
-        :type struct_type: type
-        :param struct_type: The type of neural data structure that will
-            be used by the Controller
-
-        :type time_function: function
-        :param time_function: A function mapping the length of an input
-            to the number of computational steps the network will
-            perform on that input
-
-        :type verbose: bool
-        :param verbose: If True, the progress of the experiment will be
-            displayed in the console
-        """
-        super(ReverseTask, self).__init__(batch_size=batch_size,
-                                          criterion=criterion,
-                                          cuda=cuda,
-                                          epochs=epochs,
-                                          hidden_size=hidden_size,
-                                          learning_rate=learning_rate,
-                                          l2_weight=l2_weight,
-                                          max_x_length=max_length * 2,
-                                          max_y_length=max_length * 8,
-                                          model=model,
-                                          model_type=model_type,
-                                          network_type=network_type,
-                                          read_size=read_size,
-                                          struct_type=struct_type,
-                                          time_function=time_function,
-                                          save_path=save_path,
-                                          load_path=load_path,
-                                          verbose=verbose)
-
-        self.min_length = min_length
-        self.mean_length = mean_length
-        self.std_length = std_length
-        self.max_length = max_length
-
-    def reset_model(self, model_type, network_type, struct_type, **kwargs):
-        """
-        Instantiates a neural network model of a given type that is
-        compatible with this Task. This function must set self.model to
-        an instance of model_type
-
-        :type model_type: type
-        :param model_type: A type from the models package. Please pass
-            the desired model's *type* to this parameter, not an
-            instance thereof
-
-        :type network_type: type
-        :param network_type: The type of the Network that will perform
-            the neural network computations
-
-        :type struct_type: type
-        :param struct_type: The type of neural data structure that this
-            Controller will operate
-
-        :return: None
-        """
-        self.model = model_type(3, self.read_size, 3,
-                                network_type=network_type,
-                                struct_type=struct_type,
-                                **kwargs)
+    def _init_alphabet(self, null):
+        return {unicode(i): i for i in xrange(self.num_symbols + 1)}
 
     """ Model Training """
 
@@ -203,8 +77,9 @@ class ReverseTask(Task):
         :return: The loss, number of correct guesses, and number of
             total guesses at the jth time step
         """
-        indices = (y[:, j] != 2)
-        valid_a = a[indices.view(-1, 1)].view(-1, 3)
+        indices = (y[:, j] != self.alphabet[self.null])
+        # Indexing semantics in the line below were changed in different versions of pytorch.
+        valid_a = a[indices.view(-1)].view(-1, self.alphabet_size)
         valid_y = y[:, j][indices]
         if len(valid_a) == 0:
             return None, None, None
@@ -214,7 +89,6 @@ class ReverseTask(Task):
         total = len(valid_a)
         correct = len(torch.nonzero((valid_y_ == valid_y).data))
         loss = self.criterion(valid_a, valid_y)
-
         return loss, correct, total
 
     """ Data Generation """
@@ -228,92 +102,57 @@ class ReverseTask(Task):
         """
         self.train_x, self.train_y = self.get_tensors(800)
         self.test_x, self.test_y = self.get_tensors(100)
-        return
 
     def randstr(self):
         """
-        Generates a random string of 0s and 1s. The length of the string
-        is between self.min_length and self.max_length. The average
-        length of the string is self.mean_length. The standard deviation
-        of the length of the string is self.std_length.
+        Generates a random string over self.alphabet, not including
+        NULLs. The lengths of the strings generated by this function
+        have a Gaussian distribution with the following properties.
+            Minimum Length: self.min_length
+            Maximum Length: self.max_length
+            Average Length: self.mean_length
+            Standard Deviation: self.std_length
 
         :rtype: list
         :return: A sequence of "0"s and "1"s
         """
         length = int(random.gauss(self.mean_length, self.std_length))
         length = min(max(self.min_length, length), self.max_length)
-        return [random.randint(0, 1) for _ in xrange(length)]
+        s = [random.randint(0, self.num_symbols - 1) for _ in xrange(length)]
+        return [unicode(w) for w in s]
 
-    def get_tensors(self, b):
+    def get_tensors(self, num_tensors):
         """
         Generates a dataset containing correct input and output values
-        for the reversal task. An input value is a sequence of 0s and 1s
-        in one-hot encoding, followed by "null"s. An output value is a
-        sequence of "null"s of the same length as the input, followed by
-        the reverse of the input string, as a sequence of raw characters.
+        for the reversal task. An input value is a sequence of n-many
+        symbols for some n. An output value is a sequence of n-many
+        NULLs, followed by the input value backwards. Input and output
+        values are padded to their maximum lengths with NULLs.
 
-        For example, the following is a valid input-output pair.
-            input: [0., 1., 0.], [1., 0., 0.],
-                    [0., 0., 1.], [0., 0., 1.]
-            output: null, null, 0, 1
+        For example, the following is a valid input-output pair,
+        assuming that u"2" is the null symbol.
+            Input: [u"1", u"0", u"2", u"2"]
+            Output: [u"2", u"2", u"0", u"1"]
 
-        :type b: int
-        :param b: The number of examples in the dataset
+        :type num_tensors: int
+        :param num_tensors: The number of examples in the dataset
 
         :rtype: tuple
         :return: A Variable containing the input values and a Variable
             containing the output values
         """
-        x_raw = [self.randstr() for _ in xrange(b)]
+        x_raw = [self.randstr() for _ in xrange(num_tensors)]
+        y_raw = [[self.null for _ in xrange(len(s))] + s[::-1] for s in x_raw]
 
-        # Initialize x to one-hot encodings of NULL
-        x = torch.FloatTensor(b, 2 * self.max_length, 3)
-        x[:, :, :2].fill_(0)
-        x[:, :, 2].fill_(1)
+        x_var = self.sentences_to_one_hot(self.max_x_length, *x_raw)
+        y_var = self.sentences_to_codes(self.max_y_length, *y_raw)
 
-        # Initialize y to NULL
-        y = torch.LongTensor(b, 8 * self.max_length)
-        y.fill_(2)
+        return x_var, y_var
 
-        for i, s in enumerate(x_raw):
-            t = ReverseTask.reverse(s)
-            for j, char in enumerate(s):
-                x[i, j, :] = ReverseTask.one_hot(char)
-                y[i, j + len(s)] = t[j]
-
-        return Variable(x), Variable(y)
-
-    @staticmethod
-    def reverse(s):
-        """
-        Reverses a string.
-
-        :type s: str
-        :param s: A string
-
-        :rtype: str
-        :return: s, backwards
-        """
-        return s[::-1]
-
-    @staticmethod
-    def one_hot(b):
-        """
-        Computes the following one-hot encoding:
-            0 -> [1., 0., 0.]
-            1 -> [0., 1., 0.]
-            2 -> [0., 0., 1.]
-
-        0 and 1 represent alphabet symbols.
-        2 represents "null."
-
-        :type b: int
-        :param b: 0, 1, or 2
-
-        :rtype: torch.FloatTensor
-        :return: The one-hot encoding of b
-        """
-        return torch.FloatTensor([float(i == b) for i in xrange(3)])
+    @property
+    def generic_example(self):
+        """The string for visualizations."""
+        return [u'1', u'1', u'1', u'2', u'1', u'1', u'2', u'1', u'1', u'2', u'1', u'2', u'2', u'1', u'2', u'2', u'2', u'2', u'2', u'1', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0', u'0']
 
 
 class CopyTask(ReverseTask):
@@ -321,38 +160,57 @@ class CopyTask(ReverseTask):
     String Copying
     """
 
-    def get_tensors(self, b):
+    def get_tensors(self, num_tensors):
         """
-        Like ReverseTask.get_tensors, but the output is not reversed,
-        and the output is produced immediately.
+        Generates a dataset containing correct input and output values
+        for the copy task. The input and output values are identical.
 
-        For example, the following is a valid input-output pair.
-            input: [0., 1., 0.], [1., 0., 0.],
-                    [0., 0., 1.], [0., 0., 1.]
-            output: 1, 0, null, null
-
-        :type b: int
-        :param b: The number of examples in the dataset
+        :type num_tensors: int
+        :param num_tensors: The number of examples in the dataset
 
         :rtype: tuple
         :return: A Variable containing the input values and a Variable
             containing the output values
         """
-        x_raw = [self.randstr() for _ in xrange(b)]
+        x_raw = [self.randstr() for _ in xrange(num_tensors)]
 
-        # Initialize x to one-hot encodings of NULL
-        x = torch.FloatTensor(b, 2 * self.max_length, 3)
-        x[:, :, :2].fill_(0)
-        x[:, :, 2].fill_(1)
+        x_var = self.sentences_to_one_hot(2 * self.max_length, *x_raw)
+        y_var = self.sentences_to_codes(2 * self.max_length, *x_raw)
 
-        # Initialize y to NULL
-        y = torch.LongTensor(b, 8 * self.max_length)
-        y.fill_(2)
+        return x_var, y_var
 
-        for i, s in enumerate(x_raw):
-            t = s
-            for j, char in enumerate(s):
-                x[i, j, :] = ReverseTask.one_hot(char)
-                y[i, j] = t[j]
 
-        return Variable(x), Variable(y)
+class ReverseDeletionTask(ReverseTask):
+    """
+    Reverse the result of deleting the second half of the
+    alphabet symbols from the input string.
+    Example: 12200313011 => 1101001  over the alphabet {0,1,2,3}
+    """
+
+    def get_tensors(self, num_tensors):
+        """
+        Generates a dataset containing correct input and output values
+        for the reverse deletion task.
+
+        :type num_tensors: int
+        :param num_tensors: The number of examples in the dataset
+
+        :rtype: tuple
+        :return: A Variable containing the input values and a Variable
+            containing the output values
+        """
+        x_raw = [self.randstr() for _ in xrange(num_tensors)]
+        y_raw = [[self.null for _ in xrange(len(s))] + self.reverse_with_delete(s) for s in x_raw]
+
+        x_var = self.sentences_to_one_hot(self.max_x_length, *x_raw)
+        y_var = self.sentences_to_codes(self.max_y_length, *y_raw)
+
+        return x_var, y_var
+
+    def reverse_with_delete(self, s):
+        large_symbol = self.num_symbols // 2
+        t = []
+        for symbol in s:
+            if int(symbol) < large_symbol:
+                t.append(symbol)
+        return t[::-1]
